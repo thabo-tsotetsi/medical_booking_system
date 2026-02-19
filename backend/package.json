@@ -1,0 +1,27 @@
+{
+  "name": "medical-booking-backend",
+  "version": "1.0.0",
+  "description": "Medical Booking System - API Gateway & Microservices",
+  "type": "module",
+  "scripts": {
+    "dev": "node gateway/index.js",
+    "start": "node gateway/index.js",
+    "db:migrate": "node shared/db/migrate.js",
+    "db:seed": "node ../database/seed.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.6.5",
+    "nodemailer": "^6.9.7",
+    "uuid": "^9.0.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

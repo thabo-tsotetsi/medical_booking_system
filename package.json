@@ -1,0 +1,11 @@
+{
+  "name": "medical-booking-system",
+  "private": true,
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "db:up": "docker-compose up -d mysql",
+    "db:seed": "cd backend && npm run db:seed",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+  }
+}
