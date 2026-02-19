@@ -7,5 +7,25 @@
     "db:up": "docker-compose up -d mysql",
     "db:seed": "cd backend && npm run db:seed",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
-  }
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.3.1",
+    "mysql2": "^3.17.3",
+    "uuid": "^13.0.0"
+  },
+  "version": "1.0.0",
+  "description": "A comprehensive medical appointment booking platform for patients to book slots with doctors. Built with React, Node.js microservices, and MySQL.",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thabo-tsotetsi/medical_booking_system.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/thabo-tsotetsi/medical_booking_system/issues"
+  },
+  "homepage": "https://github.com/thabo-tsotetsi/medical_booking_system#readme"
 }

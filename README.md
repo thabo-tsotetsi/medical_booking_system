@@ -111,3 +111,15 @@ See `.env.example` in each `frontend/` and `backend/` directory.
 ## License
 
 Private - Medical Booking System
+
+Getting Started
+Install dependencies: npm run install:all
+Start MySQL: npm run db:up (requires Docker)
+Seed data: npm run db:seed
+Configure: Copy backend/.env.example → backend/.env and frontend/.env.example → frontend/.env
+Run backend: npm run dev:backend
+Run frontend: npm run dev:frontend
+Test accounts (after seed):
+Doctor: doctor1@clinic.com / doctor123
+Admin: admin@medicalbooking.com / admin123
+Patient: register via Sign Up
