@@ -40,3 +40,30 @@ export async function sendBookingConfirmation({ to, patientName, doctorName, app
   const info = await transporter.sendMail(mailOptions);
   return info;
 }
+
+export async function sendCancellationEmail({ to, patientName, doctorName, appointmentDate, appointmentTime, reason }) {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #b91c1c;">Appointment Cancelled</h2>
+      <p>Dear ${patientName},</p>
+      <p>Your appointment with <strong>${doctorName}</strong> has been cancelled.</p>
+      <table style="border-collapse: collapse; width: 100%; margin: 20px 0;">
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Date</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${appointmentDate}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Time</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${appointmentTime}</td></tr>
+        ${reason ? `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Reason</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${reason}</td></tr>` : ''}
+      </table>
+      <p>You can book a new appointment through the app at any time.</p>
+      <p>Best regards,<br>Medical Booking System</p>
+    </div>
+  `;
+
+  const mailOptions = {
+    from: FROM,
+    to,
+    subject: `Appointment Cancelled - ${doctorName}`,
+    html,
+  };
+
+  const info = await transporter.sendMail(mailOptions);
+  return info;
+}

@@ -12,6 +12,7 @@ import DoctorSearchPage from './pages/patient/DoctorSearchPage';
 import BookAppointmentPage from './pages/patient/BookAppointmentPage';
 import MyAppointmentsPage from './pages/patient/MyAppointmentsPage';
 import ProfilePage from './pages/patient/ProfilePage';
+import ChatPage from './pages/patient/ChatPage';
 
 // Doctor pages (placeholder)
 import DoctorDashboard from './pages/doctor/DoctorDashboard';
@@ -29,11 +30,18 @@ function ProtectedRoute({ children, roles }: { children: React.ReactNode; roles?
   return <>{children}</>;
 }
 
+function HomeOrRedirect() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="loading">Loading...</div>;
+  if (user?.role === 'doctor') return <Navigate to="/doctor" replace />;
+  return <HomePage />;
+}
+
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<MainLayout />}>
-        <Route index element={<HomePage />} />
+        <Route path="/" element={<MainLayout />}>
+        <Route index element={<HomeOrRedirect />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
         <Route path="doctors" element={<DoctorSearchPage />} />
@@ -58,6 +66,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="chat"
+          element={
+            <ProtectedRoute roles={['patient']}>
+              <ChatPage />
             </ProtectedRoute>
           }
         />

@@ -70,9 +70,10 @@ export default function DoctorSearchPage() {
               <p style={{ color: 'var(--color-primary)', fontWeight: 600 }}>{d.specialty_name || 'General'}</p>
               {d.bio && <p style={{ fontSize: '0.9rem', color: '#666' }}>{d.bio}</p>}
               {d.consultation_fee != null && <p>Fee: ${d.consultation_fee}</p>}
-              <Link to={`/book/${d.id}`} className="btn btn-primary" style={{ marginTop: '0.5rem' }}>
-                Book Appointment
-              </Link>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                <Link to={`/book/${d.id}`} className="btn btn-primary">Book Appointment</Link>
+                <Link to={`/chat?doctorId=${d.id}`} className="btn btn-outline">Message</Link>
+              </div>
             </div>
           ))}
         </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../services/api';
+import MedicalRecordModal from '../../components/MedicalRecordModal';
 
 interface Profile {
   firstName: string;
@@ -63,17 +64,12 @@ export default function ProfilePage() {
     }
   };
 
-  const addMedicalRecord = async () => {
-    const type = prompt('Type (allergy, chronic_condition, medication, other):');
-    const name = prompt('Name:');
-    if (!type || !name) return;
-    try {
-      await api.post('/users/medical-records', { recordType: type, name });
-      const { data } = await api.get('/users/profile');
-      setProfile(data);
-    } catch (err) {
-      alert('Failed to add');
-    }
+  const [medicalRecordModalOpen, setMedicalRecordModalOpen] = useState(false);
+
+  const saveMedicalRecord = async (data: { recordType: string; name: string; description?: string; severity?: string; diagnosedDate?: string }) => {
+    await api.post('/users/medical-records', data);
+    const { data: updated } = await api.get('/users/profile');
+    setProfile(updated);
   };
 
   if (loading) return <p>Loading...</p>;
@@ -111,7 +107,13 @@ export default function ProfilePage() {
       <div className="card">
         <h2>Medical Records</h2>
         <p>Allergies, chronic conditions, medications</p>
-        <button type="button" className="btn btn-outline" onClick={addMedicalRecord} style={{ marginBottom: '1rem' }}>Add Record</button>
+        <button type="button" className="btn btn-outline" onClick={() => setMedicalRecordModalOpen(true)} style={{ marginBottom: '1rem' }}>Add Record</button>
+        <MedicalRecordModal
+          isOpen={medicalRecordModalOpen}
+          onClose={() => setMedicalRecordModalOpen(false)}
+          onSaved={() => {}}
+          saveRecord={saveMedicalRecord}
+        />
         {profile?.medicalRecords?.length ? (
           <ul style={{ listStyle: 'none', padding: 0 }}>
             {profile.medicalRecords.map((r) => (

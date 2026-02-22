@@ -213,4 +213,36 @@ router.delete('/medical-records/:id', requireRole('patient'), async (req, res, n
   }
 });
 
+// Admin: list all doctors
+router.get('/admin/doctors', requireRole('admin'), async (req, res, next) => {
+  try {
+    const list = await query(
+      `SELECT d.id, d.first_name, d.last_name, d.title, d.is_verified, u.email,
+              s.name as specialty_name
+       FROM doctors d
+       JOIN users u ON d.user_id = u.id
+       LEFT JOIN specialties s ON d.specialty_id = s.id
+       ORDER BY d.last_name`
+    );
+    res.json(list);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Admin: list all patients
+router.get('/admin/patients', requireRole('admin'), async (req, res, next) => {
+  try {
+    const list = await query(
+      `SELECT p.id, p.first_name, p.last_name, p.phone, u.email, p.created_at
+       FROM patients p
+       JOIN users u ON p.user_id = u.id
+       ORDER BY p.last_name`
+    );
+    res.json(list);
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

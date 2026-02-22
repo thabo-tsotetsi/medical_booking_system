@@ -2,23 +2,34 @@ import { Router } from 'express';
 import { authenticate, requireRole } from '../../shared/auth/middleware.js';
 import { query } from '../../shared/db/connection.js';
 import { v4 as uuidv4 } from 'uuid';
-import { sendBookingConfirmation } from '../notifications/email.js';
+import { sendBookingConfirmation, sendCancellationEmail } from '../notifications/email.js';
 
 const router = Router();
 
-// GET /api/booking/slots - Get available slots for a doctor
+// GET /api/booking/slots - Get available slots for a doctor (excludes blocked days)
 router.get('/slots', authenticate, async (req, res, next) => {
   try {
     const { doctorId, date, appointmentTypeId } = req.query;
     if (!doctorId || !date) return res.status(400).json({ error: 'doctorId and date are required' });
 
-    const slots = await query(
+    let slots = await query(
       `SELECT s.id, s.start_datetime, s.end_datetime, s.appointment_type_id
        FROM slots s
        WHERE s.doctor_id = ? AND DATE(s.start_datetime) = ? AND s.is_available = 1
        ORDER BY s.start_datetime`,
       [doctorId, date]
     );
+
+    const blocks = await query(
+      'SELECT start_datetime, end_datetime FROM availability_blocks WHERE doctor_id = ?',
+      [doctorId]
+    );
+    if (blocks.length > 0) {
+      slots = slots.filter((s) => {
+        const start = new Date(s.start_datetime).getTime();
+        return !blocks.some((b) => start >= new Date(b.start_datetime).getTime() && start < new Date(b.end_datetime).getTime());
+      });
+    }
 
     res.json(slots);
   } catch (err) {
@@ -149,6 +160,25 @@ router.patch('/appointments/:id', authenticate, async (req, res, next) => {
       if (!isDoctor && !isPatient) return res.status(403).json({ error: 'Not authorized' });
       await query('UPDATE appointments SET status = ?, cancellation_reason = ?, cancelled_at = NOW() WHERE id = ?', [status, cancellationReason || null, id]);
       await query('UPDATE slots SET is_available = 1 WHERE id = ?', [app.slot_id]);
+
+      // When doctor cancels, send email to patient with reason
+      if (isDoctor && cancellationReason) {
+        const [patientRow] = await query('SELECT p.first_name, p.last_name, u.email FROM patients p JOIN users u ON p.user_id = u.id WHERE p.id = ?', [app.patient_id]);
+        const [doctorRow] = await query('SELECT first_name, last_name, title FROM doctors WHERE id = ?', [app.doctor_id]);
+        const [slotRow] = await query('SELECT start_datetime FROM slots WHERE id = ?', [app.slot_id]);
+        const start = slotRow?.start_datetime;
+        if (patientRow?.email && start) {
+          const doctorName = doctorRow ? `${doctorRow.title || ''} ${doctorRow.first_name} ${doctorRow.last_name}`.trim() : 'Doctor';
+          await sendCancellationEmail({
+            to: patientRow.email,
+            patientName: `${patientRow.first_name} ${patientRow.last_name}`,
+            doctorName,
+            appointmentDate: new Date(start).toLocaleDateString(),
+            appointmentTime: new Date(start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            reason: cancellationReason,
+          }).catch((e) => console.error('Cancellation email failed:', e));
+        }
+      }
       return res.json({ message: 'Appointment cancelled' });
     }
 
@@ -158,6 +188,100 @@ router.patch('/appointments/:id', authenticate, async (req, res, next) => {
     }
 
     res.status(400).json({ error: 'Invalid update' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/booking/doctor/today - Doctor: today's appointments summary
+router.get('/doctor/today', authenticate, requireRole('doctor'), async (req, res, next) => {
+  try {
+    const [d] = await query('SELECT id FROM doctors WHERE user_id = ?', [req.user.id]);
+    if (!d) return res.json([]);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const list = await query(
+      `SELECT a.id, a.status, s.start_datetime, s.end_datetime,
+              p.first_name as patient_first_name, p.last_name as patient_last_name,
+              at.name as appointment_type_name
+       FROM appointments a
+       JOIN slots s ON a.slot_id = s.id
+       JOIN patients p ON a.patient_id = p.id
+       LEFT JOIN appointment_types at ON a.appointment_type_id = at.id
+       WHERE a.doctor_id = ? AND DATE(s.start_datetime) = ? AND a.status IN ('pending', 'confirmed')
+       ORDER BY s.start_datetime`,
+      [d.id, today]
+    );
+    res.json(list);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/booking/doctor/calendar - Doctor: appointments for calendar view (optional date range)
+router.get('/doctor/calendar', authenticate, requireRole('doctor'), async (req, res, next) => {
+  try {
+    const [d] = await query('SELECT id FROM doctors WHERE user_id = ?', [req.user.id]);
+    if (!d) return res.json([]);
+
+    const { from, to } = req.query;
+    const fromDate = from || new Date().toISOString().slice(0, 10);
+    const toDate = to || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const list = await query(
+      `SELECT a.id, a.status, a.cancellation_reason, s.start_datetime, s.end_datetime,
+              p.first_name as patient_first_name, p.last_name as patient_last_name,
+              at.name as appointment_type_name
+       FROM appointments a
+       JOIN slots s ON a.slot_id = s.id
+       JOIN patients p ON a.patient_id = p.id
+       LEFT JOIN appointment_types at ON a.appointment_type_id = at.id
+       WHERE a.doctor_id = ? AND DATE(s.start_datetime) BETWEEN ? AND ?
+       ORDER BY s.start_datetime`,
+      [d.id, fromDate, toDate]
+    );
+    res.json(list);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/booking/doctor/block - Doctor: block days (availability_blocks)
+router.post('/doctor/block', authenticate, requireRole('doctor'), async (req, res, next) => {
+  try {
+    const { startDate, endDate, reason } = req.body;
+    if (!startDate || !endDate) return res.status(400).json({ error: 'startDate and endDate are required' });
+
+    const [d] = await query('SELECT id FROM doctors WHERE user_id = ?', [req.user.id]);
+    if (!d) return res.status(404).json({ error: 'Doctor not found' });
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+
+    const blockId = uuidv4();
+    await query(
+      'INSERT INTO availability_blocks (id, doctor_id, start_datetime, end_datetime, reason) VALUES (?, ?, ?, ?, ?)',
+      [blockId, d.id, start, end, reason || null]
+    );
+    res.status(201).json({ id: blockId, message: 'Block added' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/booking/doctor/blocks - Doctor: list blocked dates
+router.get('/doctor/blocks', authenticate, requireRole('doctor'), async (req, res, next) => {
+  try {
+    const [d] = await query('SELECT id FROM doctors WHERE user_id = ?', [req.user.id]);
+    if (!d) return res.json([]);
+
+    const blocks = await query(
+      'SELECT id, start_datetime, end_datetime, reason FROM availability_blocks WHERE doctor_id = ? ORDER BY start_datetime DESC',
+      [d.id]
+    );
+    res.json(blocks);
   } catch (err) {
     next(err);
   }

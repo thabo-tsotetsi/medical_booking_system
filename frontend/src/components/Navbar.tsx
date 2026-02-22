@@ -14,6 +14,7 @@ export default function Navbar() {
             {user.role === 'patient' && (
               <>
                 <Link to="/appointments">My Appointments</Link>
+                <Link to="/chat">Messages</Link>
                 <Link to="/profile">Profile</Link>
               </>
             )}
